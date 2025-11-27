@@ -48,7 +48,11 @@ app.post(
     res.json({
       status: "ok",
       timestamp: new Date().toISOString(),
-      struct: structToSign,
+      struct: {
+        ...structToSign,
+        expiration_timestamp: structToSign.expiration_timestamp.toString(),
+        score: structToSign.score.toString(),
+      },
       signedStructSignature: signature,
     });
   }
