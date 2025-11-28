@@ -21,13 +21,13 @@ export async function signData(dataToSign: StructToSign): Promise<Address> {
       chainId: Number(SERVICE_CONFIG.CHAIN_ID),
     },
     types: {
-      StructToSign: [
+      Passport: [
         { name: "subject", type: "address" },
         { name: "expiration_timestamp", type: "uint256" },
         { name: "score", type: "uint64" },
       ],
     },
-    primaryType: "StructToSign",
+    primaryType: "Passport",
     message: dataToSign,
   });
 

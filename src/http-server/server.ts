@@ -1,6 +1,7 @@
 import express, { NextFunction, Request, Response } from "express";
 
 import { Address } from "viem";
+import { getMessageInfoByCid } from "../blockchain/get-transaction-details.js";
 import { signData } from "../blockchain/sign-data.js";
 import { SERVICE_CONFIG } from "../config/env.js";
 import { fetchStampsScoreByAddress } from "../services/passport-api.js";
@@ -10,6 +11,8 @@ import { StructToSign } from "../utils/types.js";
 const app = express();
 const port = SERVICE_CONFIG.APP_PORT || 3000;
 
+const bodyParser = express.json();
+
 function authMiddleware(req: Request, res: Response, next: NextFunction) {
   next();
 }
@@ -17,8 +20,6 @@ function authMiddleware(req: Request, res: Response, next: NextFunction) {
 app.get("/health", (req: Request, res: Response) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
-
-const bodyParser = express.json();
 
 app.post(
   "/sign-passport-struct",
@@ -48,17 +49,47 @@ app.post(
     res.json({
       status: "ok",
       timestamp: new Date().toISOString(),
-      struct: {
-        ...structToSign,
-        expiration_timestamp: structToSign.expiration_timestamp.toString(),
-        score: structToSign.score.toString(),
+      data: {
+        signedStructSignature: signature,
+        signedData: {
+          ...structToSign,
+          expiration_timestamp: structToSign.expiration_timestamp.toString(),
+          score: structToSign.score.toString(),
+        },
       },
-      signedStructSignature: signature,
     });
   }
 );
 
+app.get("/message-details", async (req: Request, res: Response) => {
+  if (!req.query.msgCid) {
+    return res
+      .status(400)
+      .json({ error: "Missing message CID in request body" });
+  }
+
+  const result = await getMessageInfoByCid(req.query.msgCid as string);
+
+  if (!result) {
+    return res
+      .status(500)
+      .json({ error: "Failed to fetch transaction details" });
+  }
+
+  res.json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    data: {
+      from: result.From,
+      to: result.To,
+      amount: result.Value,
+    },
+  });
+});
+
 app.listen(port, () => {
   logger.info("Attestation service started on port " + port);
   logger.info(`Health endpoint: GET /health`);
+  logger.info(`Sign passport struct endpoint: POST /sign-passport-struct`);
+  logger.info(`Get transaction details endpoint: GET /transaction-details`);
 });
