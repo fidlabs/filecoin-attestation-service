@@ -1,9 +1,16 @@
 import { Address } from "viem";
 
-export type StructToSign = {
+export type PassportDataToSign = {
   subject: Address;
   expiration_timestamp: bigint;
   score: bigint;
+};
+
+export type TransactionDetailsToSign = {
+  id: Address;
+  from: Address;
+  to: Address;
+  amount: bigint;
 };
 
 export type LotusChainGetMessageResponse = {

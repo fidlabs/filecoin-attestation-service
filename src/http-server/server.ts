@@ -2,11 +2,17 @@ import express, { NextFunction, Request, Response } from "express";
 
 import { Address } from "viem";
 import { getMessageInfoByCid } from "../blockchain/get-transaction-details.js";
-import { signData } from "../blockchain/sign-data.js";
+import {
+  signPassportData,
+  signTransactionDetailsData,
+} from "../blockchain/sign-data.js";
 import { SERVICE_CONFIG } from "../config/env.js";
 import { fetchStampsScoreByAddress } from "../services/passport-api.js";
 import { logger } from "../utils/logger.js";
-import { StructToSign } from "../utils/types.js";
+import {
+  PassportDataToSign,
+  TransactionDetailsToSign,
+} from "../utils/types.js";
 
 const app = express();
 const port = SERVICE_CONFIG.APP_PORT || 3000;
@@ -36,7 +42,7 @@ app.post(
       return res.status(500).json({ error: "Failed to fetch stamps score" });
     }
 
-    const structToSign: StructToSign = {
+    const passportDataToSign: PassportDataToSign = {
       subject: result.address as Address,
       expiration_timestamp: BigInt(
         Math.floor(new Date(result.expiration_timestamp).getTime() / 1000)
@@ -44,48 +50,69 @@ app.post(
       score: BigInt(Math.floor(Number(result.score))),
     };
 
-    const signature = await signData(structToSign);
+    const signature = await signPassportData(passportDataToSign);
 
     res.json({
       status: "ok",
       timestamp: new Date().toISOString(),
       data: {
-        signedStructSignature: signature,
+        signedSignature: signature,
         signedData: {
-          ...structToSign,
-          expiration_timestamp: structToSign.expiration_timestamp.toString(),
-          score: structToSign.score.toString(),
+          subject: passportDataToSign.subject,
+          expiration_timestamp:
+            passportDataToSign.expiration_timestamp.toString(),
+          score: passportDataToSign.score.toString(),
         },
       },
     });
   }
 );
 
-app.get("/message-details", async (req: Request, res: Response) => {
-  if (!req.query.msgCid) {
-    return res
-      .status(400)
-      .json({ error: "Missing message CID in request body" });
+app.post(
+  "/sign-message-details",
+  bodyParser,
+  authMiddleware,
+  async (req: Request, res: Response) => {
+    if (!req.body.msgCid) {
+      return res
+        .status(400)
+        .json({ error: "Missing message CID in request body" });
+    }
+
+    const result = await getMessageInfoByCid(req.query.msgCid as string);
+
+    const transactionDetailsToSign: TransactionDetailsToSign = {
+      id: req.query.msgCid as Address,
+      from: result?.From as Address,
+      to: result?.To as Address,
+      amount: BigInt(result!.Value),
+    };
+
+    const signature = await signTransactionDetailsData(
+      transactionDetailsToSign
+    );
+
+    if (!result) {
+      return res
+        .status(500)
+        .json({ error: "Failed to fetch transaction details" });
+    }
+
+    res.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      data: {
+        signedSignature: signature,
+        signedData: {
+          id: transactionDetailsToSign.id,
+          from: transactionDetailsToSign.from,
+          to: transactionDetailsToSign.to,
+          amount: transactionDetailsToSign.amount.toString(),
+        },
+      },
+    });
   }
-
-  const result = await getMessageInfoByCid(req.query.msgCid as string);
-
-  if (!result) {
-    return res
-      .status(500)
-      .json({ error: "Failed to fetch transaction details" });
-  }
-
-  res.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    data: {
-      from: result.From,
-      to: result.To,
-      amount: result.Value,
-    },
-  });
-});
+);
 
 app.listen(port, () => {
   logger.info("Attestation service started on port " + port);
