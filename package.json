@@ -20,7 +20,7 @@
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.2",
     "semver": "^7.7.3",
-    "viem": "^2.38.6"
+    "viem": "^2.57.16"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
